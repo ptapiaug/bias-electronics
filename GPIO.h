@@ -20,4 +20,11 @@
 #define BUTTON3PINCTRL   PIN7CTRL
 #define BUTTON_MASK      0xF0
 
+//interrupt vector
+#define BUTTON_INT0_vect PORTF_INT0_vect
+#define BUTTON_INT1_vect PORTF_INT1_vect
+
+/*! initialize GPIO BUTTONs port */
+void GPIO_init( void );
+
 #endif // _GPIO_H

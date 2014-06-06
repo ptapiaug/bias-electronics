@@ -15,6 +15,9 @@ volatile char cmd[20];
 volatile char *cmd_pos = cmd;
 volatile uint8_t got_cmd;
 
+volatile uint8_t got_button = 0;
+volatile uint8_t button_value = 0;
+
 void init( void )
 {
   // Clock settings
@@ -34,8 +37,12 @@ void init( void )
   // initialize serial interface
   RS232_init();
 
+  // initialize GPIOS buttons
+  GPIO_init();
+
   // enable interrupts
-  sei(); 
+  sei();
+
 
   // Port settings (definitions in GPIO.h)
   ONBOARD_LED_PORT.DIRSET |= ONBOARD_LED;   // LED pin is Output
@@ -43,12 +50,7 @@ void init( void )
 
   PORTA.DIRSET = 0xff;  // all pins of PORTA are outputs
   LED_PORT.DIRSET = 0xFF; // all LED are output
-  BUTTON_PORT.DIRSET &= ~BUTTON_MASK;  // pushbuttons are inputs
-  // pullup for pushbutton pins
-  BUTTON_PORT.BUTTON0PINCTRL = PORT_OPC_PULLUP_gc;
-  BUTTON_PORT.BUTTON1PINCTRL = PORT_OPC_PULLUP_gc;
-  BUTTON_PORT.BUTTON2PINCTRL = PORT_OPC_PULLUP_gc;
-  BUTTON_PORT.BUTTON3PINCTRL = PORT_OPC_PULLUP_gc;
+
 }
 
 
@@ -86,14 +88,90 @@ int main(void)
 
   while( true )
   {
-    // check pushbuttons
-    if ( BUTTON_MASK != ( BUTTON_PORT.IN & BUTTON_MASK ) )
+    if( got_button )
     {
-      // toggle corresponding LED
-      LED_PORT.OUTTGL = ~BUTTON_PORT.IN & BUTTON_MASK;
-      // wait for button to be released
-      while ( BUTTON_MASK != ( BUTTON_PORT.IN & BUTTON_MASK ) );
+      got_button=false;
+      switch(BUTTON_PORT.IN & BUTTON_MASK)
+      {
+        default:
+          break;
+        case 0x70:
+          sprintf( string, "%s compiled %s, %s",
+                   __FILE__, __DATE__, __TIME__ );
+          RS232_SendString( string );
+          
+          break;
+        case 0Xb0: // set DAC channel c to value v
+          // read channel and value from input string
+          sscanf( (const char *)cmd + 1, "%hhu %"SCNi16"", &c, &v );
+          // set DAC
+          DAC7615_SetOutput( 3, 2045 );
+          // write channel and value to output string
+          sprintf( string, "%d %d", 3, 2045 );
+          // send string via RS232
+          RS232_SendString( string );
+          break;
+        case 0Xd0: // read ADC channel c
+          
+          // write ADC value to output string
+          sprintf( string, "%d", LTC1859_ReadSingleChannel( 7 ) );
+          // send string via RS232
+          RS232_SendString( string );
+          break;
+        case 0Xe0: // sweep DAC, read value, store in SRAM. When done, dump data
+          // show start of measurement on LEDs
+          LED_PORT.OUTSET = 0x09;
+          // prepare SRAM to store data starting from address 0
+          MC23K256_StartSequential( 0, MC23K256_WRITE );
+          // sweep up
+          for ( v = 0; v <= DAC7615_MAXVALUE; v++ )
+          {
+            // set new DAC value
+            DAC7615_SetOutput( 3, v );
+            delay_us(10); // DAC settling time
+            // read ADC and store readout in SRAM
+            MC23K256_SequentialWriteWord( LTC1859_ReadSingleChannel( 7 ) );
+          }
+          // sweep down
+          for ( v = DAC7615_MAXVALUE; v >= 0; v-- )
+          {
+            // set new DAC value
+            DAC7615_SetOutput( 3, v );
+            delay_us(10); // DAC settling time
+            // read ADC and store readout in SRAM
+            MC23K256_SequentialWriteWord( LTC1859_ReadSingleChannel( 7 ) );
+          }
+          MC23K256_StopSequential();
+          // show end of data transfer on LEDs
+          LED_PORT.OUTCLR = 0x09;
+
+          // show start of data transfer on LEDs
+          LED_PORT.OUTSET = 0x06;
+          // prepare SRAM to read data starting from address 0
+          MC23K256_StartSequential( 0, MC23K256_READ );
+          for ( v = 0; v <= 2 * DAC7615_MAXVALUE + 1; v++ )
+          {
+            // read 2 bytes from SRAM and write to string
+            sprintf( string, "%d", MC23K256_SequentialReadWord() );
+            // send string
+            RS232_SendString( string );
+          }
+          MC23K256_StopSequential();
+          // show end of data transfer on LEDs
+          LED_PORT.OUTCLR = 0x06;
+          break;
+      }
+
     }
+
+    // // check pushbuttons
+    // if ( BUTTON_MASK != ( BUTTON_PORT.IN & BUTTON_MASK ) )
+    // {
+    //   // toggle corresponding LED
+    //   LED_PORT.OUTTGL = ~BUTTON_PORT.IN & BUTTON_MASK;
+    //   // wait for button to be released
+    //   while ( BUTTON_MASK != ( BUTTON_PORT.IN & BUTTON_MASK ) );
+    // }
 
     // check whether we got a command from RS232
     if ( got_cmd )   // command received
