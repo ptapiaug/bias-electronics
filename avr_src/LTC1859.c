@@ -15,6 +15,9 @@
 
 SPI_Master_t spiMaster_LTC1859;
 
+// channel numbering of ADC does not match adresses
+uint8_t ADC_addr[] = { 0, 4, 1, 5, 2, 6, 3, 7 };
+
 /*! initialize SPI port for LTC1859 */
 void LTC1859_SPI_Init()
 {
@@ -27,7 +30,7 @@ void LTC1859_SPI_Init()
   LTC1859_CS_PORT.OUTSET = LTC1859_CS_PIN_bm;
 
   // define BUSY pin as input
-  // LTC1859_BUSY_PORT.DIRCLR = LTC1859_BUSY_PIN_bm;
+  LTC1859_BUSY_PORT.DIRCLR = LTC1859_BUSY_PIN_bm;
 
   // initialize SPI master
   SPI_MasterInit( &spiMaster_LTC1859, 
@@ -43,25 +46,24 @@ void LTC1859_SPI_Init()
 
 
 /*! read single channel */
-uint16_t LTC1859_ReadSingleChannel( uint8_t channel )
+LTC1859_DATA_t LTC1859_ReadSingleChannel( uint8_t channel )
 {
-  uint16_t ret;
+  LTC1859_DATA_t ret;
 
-  // first conversion
   // chip select low
   SPI_MasterSSLow( &LTC1859_CS_PORT, LTC1859_CS_PIN_bm );
   // send command word
-  SPI_MasterTransceiveByte( &spiMaster_LTC1859, LTC1859_CMD |
-                                                ( ( channel & 0x7 ) << 4 ) );
+  SPI_MasterTransceiveByte( &spiMaster_LTC1859,
+                            LTC1859_CMD | ( ADC_addr[ channel & LTC1859_ADDR_MASK ] << LTC1859_ADDR_SHIFT ) );
   SPI_MasterTransceiveByte( &spiMaster_LTC1859, 0x0 );
-  // chip select high
+  // chip select high - starts conversion
   SPI_MasterSSHigh( &LTC1859_CS_PORT, LTC1859_CS_PIN_bm );
   // wait for end of conversion, max. 5 usec
-  // while ( !(LTC1859_0_BUSY_PORT.IN & LTC1859_BUSY_PIN_bm ) )
+  while ( !(LTC1859_BUSY_PORT.IN & LTC1859_BUSY_PIN_bm ) )
     // WDT_Reset();
-  delay_us( 5 );
+  // delay_us( 5 );
 
-  // second conversion to read result
+  //  read result
   // chip select low
   SPI_MasterSSLow( &LTC1859_CS_PORT, LTC1859_CS_PIN_bm );
   // first byte
