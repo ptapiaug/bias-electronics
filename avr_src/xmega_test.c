@@ -8,6 +8,11 @@
 #include "LTC1859.h"
 #include "DAC7615.h"
 #include "MC23K256.h"
+//##//
+#include "../include/commands.h"
+#include "global.h"
+#include "hw_status.h"
+//##//
 
 
 char string[80];
@@ -57,9 +62,15 @@ void init( void )
 
 int main(void)
 {
+//####//
+  MIXER_ADDR_WORD_t channel_mask = 0;
+  char *cmd_p;
+//####//
+
   uint8_t i, c;
   int16_t v = 0;
   char string[ 80 ];
+
 
   // initialize clock, RS232 and GPIO
   init();
@@ -86,24 +97,39 @@ int main(void)
   RS232_SendChar( 'o' );
   RS232_SendChar( '\n' );
 
-  while( true )
-  {
+/////////////////////////////////////////////////
+//////////Main Code//////////////////////////////
+/////////////////////////////////////////////////
+
+  while( true ){
+      
+    WDT_Reset(); //watchdog reset
     
-    if ( got_cmd )   // command received
-    {
-      // clear command number display, maintain pushbutton display
-      LED_PORT.OUTCLR = (uint8_t)~BUTTON_MASK; // cast avoids compiler warning
+    if ( got_cmd ){// command received
+      
       got_cmd = false;
-      switch ( cmd[0] )  // check first byte of command string
-      {
+      
+      channel_mask = cmd[0]; // pointer to command byte
+      //(char *) cast to eliminate volatile type
+      cmd_p = (char *)cmd + sizeof( MIXER_ADDR_WORD_t ); 
+      
+      // check command byte. *Read the content of the memory at that adress.
+      // ++ increment one size of the data type, this because we want to point at the parameters section.
+      switch ( *cmd_p++ ){
+        
         default:
-          break;
-        case 'v': // Version information
-          sprintf( string, "%s compiled %s, %s",
-                   __FILE__, __DATE__, __TIME__ );
+        break;
+        
+        case STATUS: // Version information
+          sprintf( string, " %s", read_device_id() );
           RS232_SendString( string );
-          i = 1; // command number
+          sprintf( string, " Firmware: %s compiled on %s, %s",
+                  __FILE__, __DATE__, __TIME__ );
+          RS232_SendString( string );
+          sprintf( string, " Version: $Revision:$, $Date:$" );
+          RS232_SendString( string );
           break;
+        
         case 'D': // set DAC channel c to value v
           // read channel and value from input string
           sscanf( (const char *)cmd + 1, "%hhu %"SCNi16"", &c, &v );
@@ -187,6 +213,53 @@ int main(void)
           watchdog_init( WDT_PER_8CLK_gc  ); // set watchdog timer to 8 msec
           while ( true ); // infinite loop to wait for reset
           break;
+        //test
+        case TEST:
+          //set channels voltages
+
+          DAC7615_SetOutput( 1, 1000); //B -0.512
+          DAC7615_SetOutput( 2, 2500); //C 0.552
+          DAC7615_SetOutput( 3, 3500); //D 1.772
+          
+          sprintf( string, "B:-0.512, C:0.552, D:1.772C");
+          RS232_SendString( string );
+          
+          //read channels before relay
+          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
+          RS232_SendString( string );
+
+          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
+          RS232_SendString( string );  
+
+          //enable relays
+          PORTA.OUT |= (1 << 4);   // This set 1 in pin4
+          PORTA.OUT &= ~(0 << 5);   // This set 0 in pin5
+          sprintf( string, "Relay enabled");
+          RS232_SendString( string );
+          delay_us(10000);
+          //read channels before relay
+          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
+          RS232_SendString( string );
+
+          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
+          RS232_SendString( string );          
+
+          //disable relays
+          PORTA.OUT |= (1 << 4);  // This set 1 in pin4
+          PORTA.OUT |= (1 << 5);  // This set 1 in pin5
+          sprintf( string, "Relay disabled");
+          RS232_SendString( string );
+          delay_us(10000);
+
+          //read channels before relay
+          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
+          RS232_SendString( string );
+
+          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
+          RS232_SendString( string );
+
+          break;
+
       }
       // display command number on LEDs
       LED_PORT.OUTSET = i;

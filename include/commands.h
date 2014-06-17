@@ -59,6 +59,8 @@
 // #define SET_DEBUG_PORT     0xF1
 // #define DAC7568_REF_ON     0xF2
 // #define DAC7568_REF_OFF    0xF3
+#define TEST               0xFA
 #define TOGGLE_DEBUG       0xFD
 #define STATUS             0xFE
 #define RESET              0xFF
+

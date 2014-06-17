@@ -81,7 +81,7 @@ OBJDIR = .
 
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c serial.c GPIO.c usart_driver.c watchdog.c LTC1859.c spi_driver.c DAC7615.c MC23K256.c
+SRC = $(TARGET).c serial.c GPIO.c usart_driver.c watchdog.c LTC1859.c spi_driver.c DAC7615.c MC23K256.c hw_status.c
 # SRC = $(TARGET).c serial.c MC_23K256.c usart_driver.c spi_driver.c EnumAppNote_BF1.c
 
 
