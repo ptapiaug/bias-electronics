@@ -11,6 +11,10 @@ $Id:$
 
 #include <stdint.h>
 
+// Address of the Bias, Magnet field & LNA's
+#define DAC7615_BIAS_CHANNEL			0x0			
+#define DAC7615_MAGNET_CHANNEL		0x1
+
 // SPI parameter
 #define DAC7615_SPI_MODULE        SPIC
 #define DAC7615_SPI_PORT          PORTC

@@ -12,6 +12,10 @@
 #include "../include/commands.h"
 #include "global.h"
 #include "hw_status.h"
+#include "ctype.h"
+#include "string.h"
+#include "mixer.h"
+#include "LNA.h"
 //##//
 
 
@@ -20,8 +24,50 @@ volatile char cmd[20];
 volatile char *cmd_pos = cmd;
 volatile uint8_t got_cmd;
 
+uint8_t debug = false;
+
 volatile uint8_t got_button = 0;
 volatile uint8_t button_value = 0;
+
+
+uint16_t read_int16( volatile char *s )
+{
+  uint16_t ret = 0;
+  uint8_t negative = false;
+
+  if ( debug )
+  {
+    sprintf( string, "read_int16: %s  ->  ", (char *)s );
+  }
+
+  while( isspace( *s ) )
+    s++;
+  if ( '-' == *s )
+  {
+    negative = true;
+    s++;
+  }
+  while ( isdigit( *s ) )
+  {
+    ret *= 10;
+    ret += *s++ - 48;
+  }
+
+  if ( negative )
+    ret = (uint16_t)( - ( ret & 0x7FFF ) );
+
+  if ( debug )
+  {
+    if ( negative )
+      sprintf( string + strlen( string), "%"PRIi16"", ret );
+    else
+      sprintf( string + strlen( string), "%"PRIu16"", ret );
+    RS232_SendString( string );
+  }
+
+  return( ret );
+}
+
 
 void init( void )
 {
@@ -54,6 +100,7 @@ void init( void )
   ONBOARD_LED_PORT.OUT     = ONBOARD_LED;   // LED pin high (LED off)
 
   PORTA.DIRSET = 0xff;  // all pins of PORTA are outputs
+  PORTD.DIRSET = 0x6;
   LED_PORT.DIRSET = 0xFF; // all LED are output
 
 }
@@ -120,7 +167,7 @@ int main(void)
         default:
         break;
         
-        case STATUS: // Version information
+        case STATUS: // Version information 0XFE
           sprintf( string, " %s", read_device_id() );
           RS232_SendString( string );
           sprintf( string, " Firmware: %s compiled on %s, %s",
@@ -129,19 +176,47 @@ int main(void)
           sprintf( string, " Version: $Revision:$, $Date:$" );
           RS232_SendString( string );
           break;
+
+        case SET_BIAS_VOLTAGE:
+          mixer_bias( read_int16( cmd_p ));
+          sprintf( string, " Bias Voltage (ch 0) set in %d", read_int16(cmd_p));
+          RS232_SendString( string );
+          break;
         
-        case 'D': // set DAC channel c to value v
+        case SET_MAGNET_CURRENT:
+          mixer_magnet( read_int16( cmd_p ));
+          sprintf( string, " Magnet Voltage (ch 1) set in %d", read_int16(cmd_p));
+          RS232_SendString( string );
+          break;
+
+        case SET_LNA_VOLTAGE_A:
+            set_lna_voltage(LNA_VOLTAGE_A, read_int16(cmd_p));
+            sprintf( string, " LNA A Voltage (ch 2) set in %d", read_int16(cmd_p));
+            RS232_SendString( string );
+            break;
+
+        case SET_LNA_VOLTAGE_B:
+            set_lna_voltage(LNA_VOLTAGE_B, read_int16(cmd_p));
+            sprintf( string, " LNA B Voltage (ch 3) set in %d", read_int16(cmd_p));
+            RS232_SendString( string );
+            break;
+
+        case SET_CHANNEL: // set DAC channel c to value v 0xF0
           // read channel and value from input string
           sscanf( (const char *)cmd + 1, "%hhu %"SCNi16"", &c, &v );
           // set DAC
-          DAC7615_SetOutput( c, v );
+          // DAC7615_SetOutput( c, v );
+          DAC7615_SetOutput( 0, 4095 );
+          DAC7615_SetOutput( 1, 4095 );
+          DAC7615_SetOutput( 2, 4095 );
+          DAC7615_SetOutput( 3, 4095 );
           // write channel and value to output string
-          sprintf( string, "%d %d", c, v );
+          sprintf( string, " bla %d %d", c, v );
           // send string via RS232
           RS232_SendString( string );
           i = 2; // command number
           break;
-        case 'a': // read ADC channel c
+        case GET_CHANNEL: // read ADC channel c 0xF1
           // read channel number from input string
           c = atoi( (const char *)cmd + 1 );
           // write ADC value to output string
@@ -193,27 +268,31 @@ int main(void)
           LED_PORT.OUTCLR = 0x06;
           i = 4; // command number
           break;
-        case 'e':
-          PORTA.OUT |= (1 << 4);   // This set 1 in pin4
-          PORTA.OUT &= ~(0 << 5);   // This set 0 in pin5
-          // write channel and value to output string
+        
+        case RELAY_ENABLE: //0xF2
+          PORTD.OUTSET = 0x2;   //pin 1. OptoFet always ON
+          PORTD.OUTSET = 0x4;   //pin 2. Set Gain low 
+          PORTA.OUTSET = 0x10;  //pin 4. Enable relay (XOR gate)
+          PORTA.OUTCLR = 0x20;  //pin 5. Enable relay (XOR gate)
+          PORTD.OUTCLR = 0x4;   //Set gain High again.
+
           sprintf( string, "Relay enabled");
-          // send string via RS232
           RS232_SendString( string );
           break;
-        case 'd':
-          PORTA.OUT |= (1 << 4);  // This set 1 in pin4
-          PORTA.OUT |= (1 << 5);  // This set 1 in pin5
-          // write channel and value to output string
+        
+        case RELAY_DISABLE: //0xF3
+          PORTA.OUTSET = 0x10;  //pin 4. Disable relay (XOR gate) 
+          PORTA.OUTSET = 0x20;  //pin 5. Disable relay (XOR gate)
+          
           sprintf( string, "Relay disabled");
-          // send string via RS232
           RS232_SendString( string );
           break;
-        case 'R': // Reset
+        
+        case RESET: // Reset
           watchdog_init( WDT_PER_8CLK_gc  ); // set watchdog timer to 8 msec
           while ( true ); // infinite loop to wait for reset
           break;
-        //test
+        
         case TEST:
           //set channels voltages
 
@@ -225,10 +304,10 @@ int main(void)
           RS232_SendString( string );
           
           //read channels before relay
-          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
+          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); 
           RS232_SendString( string );
 
-          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
+          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); 
           RS232_SendString( string );  
 
           //enable relays
@@ -237,6 +316,7 @@ int main(void)
           sprintf( string, "Relay enabled");
           RS232_SendString( string );
           delay_us(10000);
+
           //read channels before relay
           sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
           RS232_SendString( string );
@@ -244,19 +324,24 @@ int main(void)
           sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
           RS232_SendString( string );          
 
-          //disable relays
-          PORTA.OUT |= (1 << 4);  // This set 1 in pin4
-          PORTA.OUT |= (1 << 5);  // This set 1 in pin5
-          sprintf( string, "Relay disabled");
-          RS232_SendString( string );
-          delay_us(10000);
-
-          //read channels before relay
-          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
+          DAC7615_SetOutput( 0, 500); //A 1.772
+          
+          sprintf( string, "A:-2.347");
           RS232_SendString( string );
 
-          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
-          RS232_SendString( string );
+          // //disable relays
+          // PORTA.OUT |= (1 << 4);  // This set 1 in pin4
+          // PORTA.OUT |= (1 << 5);  // This set 1 in pin5
+          // sprintf( string, "Relay disabled");
+          // RS232_SendString( string );
+          // delay_us(10000);
+
+          // //read channels before relay
+          // sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
+          // RS232_SendString( string );
+
+          // sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
+          // RS232_SendString( string );
 
           break;
 
