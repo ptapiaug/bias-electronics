@@ -75,7 +75,6 @@ void DAC7615_LoadRegister( uint8_t channel, uint16_t value )
 }
 
 
-
 /*! set selected output channel to value */
 void DAC7615_SetOutput( uint8_t channel, uint16_t value )
 {

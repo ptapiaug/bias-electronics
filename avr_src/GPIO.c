@@ -36,7 +36,3 @@ ISR( BUTTON_INT0_vect )
   } 
 }
 
-// ISR( BUTTON_INT1_vect )
-// {
-//   got_button = true;
-// }

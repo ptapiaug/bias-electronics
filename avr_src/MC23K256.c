@@ -36,8 +36,6 @@ void MC23K256_SPI_Init()
                   MC23K256_SPI_PRESCALER );
 }
 
-
-
 /*! set io-mode for SRAM */
 void MC23K256_SetMode( uint8_t mode )
 {
@@ -53,8 +51,6 @@ void MC23K256_SetMode( uint8_t mode )
   io_mode = MC23K256_BYTE_MODE;
 }
 
-
-
 /*! read status byte from SRAM */
 uint8_t MC23K256_ReadStatusByte()
 {
@@ -67,8 +63,6 @@ uint8_t MC23K256_ReadStatusByte()
 
   return( ret );
 }
-
-
 
 /*! read single byte from SRAM */
 uint8_t MC23K256_ReadByte( uint16_t a )
@@ -89,8 +83,6 @@ uint8_t MC23K256_ReadByte( uint16_t a )
   return( ret );
 }
 
-
-
 /*! read word from SRAM in byte mode */
 uint16_t MC23K256_ReadWord( uint16_t a )
 {
@@ -99,9 +91,6 @@ uint16_t MC23K256_ReadWord( uint16_t a )
   ret = MC23K256_ReadByte( a++ ) << 8;
   return( ret | MC23K256_ReadByte( a ) );
 }
-
-
-
 
 /*! write single byte to address a of SRAM */
 void MC23K256_WriteByte( uint16_t a, uint8_t b )
@@ -118,16 +107,12 @@ void MC23K256_WriteByte( uint16_t a, uint8_t b )
   SPI_MasterSSHigh( &MC23K256_SPI_PORT, MC23K256_CS_PIN_bm );
 }
 
-
-
 /*! write word to address a of SRAM in byte mode */
 void MC23K256_WriteWord( uint16_t a, uint16_t w )
 {
   MC23K256_WriteByte( a++, w >> 8 );
   MC23K256_WriteByte( a, w & 0xff );
 }
-
-
 
 /*! start sequential SRAM access (read or write, sequential mode only) */
 uint8_t MC23K256_StartSequential( uint16_t a, uint8_t rw )
@@ -146,8 +131,6 @@ uint8_t MC23K256_StartSequential( uint16_t a, uint8_t rw )
   return( 0 );
 }
 
-
-
 /*! terminate sequential SRAM access (read or write, sequential mode only),
     leave device in sequential mode */
 void MC23K256_StopSequential()
@@ -156,15 +139,11 @@ void MC23K256_StopSequential()
   SPI_MasterSSHigh( &MC23K256_SPI_PORT, MC23K256_CS_PIN_bm );
 }
 
-
-
 /*! pull next byte from SRAM (sequential mode only!) */
 uint8_t MC23K256_SequentialReadByte()
 {
   return( SPI_MasterTransceiveByte( &spiMaster_MC23K256, 0x00 ) );
 }
-
-
 
 /*! pull next word from SRAM (sequential mode only!) */
 uint16_t MC23K256_SequentialReadWord()
@@ -175,15 +154,11 @@ uint16_t MC23K256_SequentialReadWord()
   return( ret | SPI_MasterTransceiveByte( &spiMaster_MC23K256, 0x00 ) );
 }
 
-
-
 /*! append byte to SRAM (sequential mode only!) */
 void MC23K256_SequentialWriteByte( uint8_t b )
 {
   SPI_MasterTransceiveByte( &spiMaster_MC23K256, b );
 }
-
-
 
 /*! append word to SRAM (sequential mode only!) */
 void MC23K256_SequentialWriteWord( uint16_t w )

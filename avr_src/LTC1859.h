@@ -13,6 +13,10 @@
 
 #include <stdint.h>
 
+//Mixer channel address
+#define LTC1859_MIXER_VOLTAGE 0x0
+#define LTC1859_MIXER_CURRENT 0x1
+
 // ADC parameters
 #define LTC1859_SGL  (1<<7) // 0: differential, 1: single ended
 #define LTC1859_UNI  (0<<3) // 0: bipolar, 1: unipolar
@@ -65,5 +69,11 @@ void LTC1859_SPI_Init( void );
 
 /*! read single channel */
 LTC1859_DATA_t LTC1859_ReadSingleChannel( uint8_t channel );
+
+/* set first configuration for Scan */
+void LTC1859_SetConfig( uint8_t channel);
+
+/* Get previous conversion, read actual channel and set the configuration for next conversion*/
+LTC1859_DATA_t LTC1859_ReadChannel_SetNextConfig( uint8_t channel );
 
 #endif // _LTC1859_H

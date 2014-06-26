@@ -50,7 +50,7 @@ void RS232_SendString( const char *string )
 
 
 /*! send single character via RS232 */
-void RS232_SendChar( const char c )
+void RS232_SendChar( const char c ) // If the Size is bigger, this send the less significant byte.
 {
   /* Send one char. */
   do{

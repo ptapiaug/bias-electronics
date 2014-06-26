@@ -18,11 +18,11 @@
 #include "LNA.h"
 //##//
 
-
 char string[80];
 volatile char cmd[20];
 volatile char *cmd_pos = cmd;
 volatile uint8_t got_cmd;
+extern MIXER mixer;
 
 uint8_t debug = false;
 
@@ -36,35 +36,26 @@ uint16_t read_int16( volatile char *s )
   uint8_t negative = false;
 
   if ( debug )
-  {
     sprintf( string, "read_int16: %s  ->  ", (char *)s );
-  }
-
   while( isspace( *s ) )
     s++;
-  if ( '-' == *s )
-  {
+  if ( '-' == *s ){
     negative = true;
     s++;
   }
-  while ( isdigit( *s ) )
-  {
+  while ( isdigit( *s ) ){
     ret *= 10;
     ret += *s++ - 48;
   }
-
   if ( negative )
     ret = (uint16_t)( - ( ret & 0x7FFF ) );
-
-  if ( debug )
-  {
+  if ( debug ){
     if ( negative )
       sprintf( string + strlen( string), "%"PRIi16"", ret );
     else
       sprintf( string + strlen( string), "%"PRIu16"", ret );
     RS232_SendString( string );
   }
-
   return( ret );
 }
 
@@ -94,7 +85,6 @@ void init( void )
   // enable interrupts
   sei();
 
-
   // Port settings (definitions in GPIO.h)
   ONBOARD_LED_PORT.DIRSET |= ONBOARD_LED;   // LED pin is Output
   ONBOARD_LED_PORT.OUT     = ONBOARD_LED;   // LED pin high (LED off)
@@ -110,6 +100,8 @@ void init( void )
 int main(void)
 {
 //####//
+  uint8_t mixer_sweep = MIXER_NO_SWEEP;
+  
   MIXER_ADDR_WORD_t channel_mask = 0;
   char *cmd_p;
 //####//
@@ -118,6 +110,8 @@ int main(void)
   int16_t v = 0;
   char string[ 80 ];
 
+  uint16_t value;
+  uint8_t msB, lsB;
 
   // initialize clock, RS232 and GPIO
   init();
@@ -127,6 +121,9 @@ int main(void)
   LTC1859_SPI_Init();
   // initialize SRAM
   MC23K256_SPI_Init();
+  // initialize Mixers
+  init_mixers();
+
 
   // Alive signal: blink onboard LED 3 times
   for ( i = 0; i < 6; i++ )
@@ -167,6 +164,17 @@ int main(void)
         default:
         break;
         
+        case TEST:
+
+          value=0x5060;
+          msB= (uint8_t) (value >> 8);
+          lsB= (uint8_t) (value);
+          RS232_SendChar(lsB);
+          RS232_SendChar(msB);          
+
+          break;
+
+
         case STATUS: // Version information 0XFE
           sprintf( string, " %s", read_device_id() );
           RS232_SendString( string );
@@ -195,159 +203,103 @@ int main(void)
             RS232_SendString( string );
             break;
 
+        case GET_LNA_VOLTAGE_A:
+            sprintf(string, "LNA_A: %d", get_lna_voltage(LNA_VOLTAGE_A) );
+            RS232_SendString( string );
+          break;
+
+        case GET_LNA_VOLTAGE_B:
+            sprintf(string, "LNA_B: %d", get_lna_voltage(LNA_VOLTAGE_B) );
+            RS232_SendString( string );
+          break;
+
         case SET_LNA_VOLTAGE_B:
             set_lna_voltage(LNA_VOLTAGE_B, read_int16(cmd_p));
             sprintf( string, " LNA B Voltage (ch 3) set in %d", read_int16(cmd_p));
             RS232_SendString( string );
             break;
 
-        case SET_CHANNEL: // set DAC channel c to value v 0xF0
-          // read channel and value from input string
-          sscanf( (const char *)cmd + 1, "%hhu %"SCNi16"", &c, &v );
-          // set DAC
-          // DAC7615_SetOutput( c, v );
-          DAC7615_SetOutput( 0, 4095 );
-          DAC7615_SetOutput( 1, 4095 );
-          DAC7615_SetOutput( 2, 4095 );
-          DAC7615_SetOutput( 3, 4095 );
-          // write channel and value to output string
-          sprintf( string, " bla %d %d", c, v );
-          // send string via RS232
+        case MIXER_STATUS:
+          sprintf( string,"Mixer Status = %u", 
+                  mixer.status);
           RS232_SendString( string );
-          i = 2; // command number
-          break;
-        case GET_CHANNEL: // read ADC channel c 0xF1
-          // read channel number from input string
-          c = atoi( (const char *)cmd + 1 );
-          // write ADC value to output string
-          sprintf( string, "%d", LTC1859_ReadSingleChannel( c ) );
-          // send string via RS232
-          RS232_SendString( string );
-          i = 3; // command number
-          break;
-        case 'S': // sweep DAC, read value, store in SRAM. When done, dump data
-          // show start of measurement on LEDs
-          LED_PORT.OUTSET = 0x09;
-          // prepare SRAM to store data starting from address 0
-          MC23K256_StartSequential( 0, MC23K256_WRITE );
-          // sweep up
-          for ( v = 0; v <= DAC7615_MAXVALUE; v++ )
-          {
-            // set new DAC value
-            DAC7615_SetOutput( 3, v );
-            delay_us(10); // DAC settling time
-            // read ADC and store readout in SRAM
-            MC23K256_SequentialWriteWord( LTC1859_ReadSingleChannel( 7 ) );
-          }
-          // sweep down
-          for ( v = DAC7615_MAXVALUE; v >= 0; v-- )
-          {
-            // set new DAC value
-            DAC7615_SetOutput( 3, v );
-            delay_us(10); // DAC settling time
-            // read ADC and store readout in SRAM
-            MC23K256_SequentialWriteWord( LTC1859_ReadSingleChannel( 7 ) );
-          }
-          MC23K256_StopSequential();
-          // show end of data transfer on LEDs
-          LED_PORT.OUTCLR = 0x09;
 
-          // show start of data transfer on LEDs
-          LED_PORT.OUTSET = 0x06;
-          // prepare SRAM to read data starting from address 0
-          MC23K256_StartSequential( 0, MC23K256_READ );
-          for ( v = 0; v <= 2 * DAC7615_MAXVALUE + 1; v++ )
-          {
-            // read 2 bytes from SRAM and write to string
-            sprintf( string, "%d", MC23K256_SequentialReadWord() );
-            // send string
+          sprintf( string,"Mixer Voltage [-16384,16384] = %d. mixer.bias_value [0,4095] = %d", 
+                  LTC1859_ReadSingleChannel( LTC1859_MIXER_VOLTAGE),
+                  mixer.bias_value);
+          RS232_SendString( string );
+
+          sprintf( string,"Mixer Current [-16384,16384] = %d", 
+                  LTC1859_ReadSingleChannel( LTC1859_MIXER_CURRENT));
+          RS232_SendString( string );
+          break;
+
+        case ENABLE_MIXER:
+          mixer_enable();
+          sprintf( string,
+                  "Mixer Enabled. mixer.bias_value = %d, mixer.magnet_value= %d",
+                  mixer.bias_value,
+                  mixer.magnet_value);
+          RS232_SendString( string );
+          break;
+
+        case DISABLE_MIXER:
+          mixer_disable();
+          sprintf( string,
+                  "Mixer disabled. mixer.bias_value = %d, mixer.magnet_value= %d",
+                  mixer.bias_value,
+                  mixer.magnet_value);
+          RS232_SendString( string );
+          break;
+
+        case START_BIAS_SWEEP:
+          mixer_sweep = MIXER_BIAS_SWEEP;
+          sprintf( string,
+                  "Bias Sweep Enabled");
+          RS232_SendString( string );
+          break;
+
+        case START_MAGNET_SWEEP:
+          mixer_sweep = MIXER_MAGNET_SWEEP;
+          sprintf( string,
+                  "Magnet Sweep Enabled");
+          RS232_SendString( string );
+          break;
+
+        case STOP_SWEEP:
+          if (mixer_sweep == MIXER_BIAS_SWEEP){
+            mixer_bias_restore();
+            sprintf( string,
+                  "Bias Sweep Disabled");
             RS232_SendString( string );
           }
-          MC23K256_StopSequential();
-          // show end of data transfer on LEDs
-          LED_PORT.OUTCLR = 0x06;
-          i = 4; // command number
+          if (mixer_sweep == MIXER_MAGNET_SWEEP){
+            mixer_magnet_restore();
+            sprintf( string,
+                  "Magnet Sweep Disabled");
+            RS232_SendString( string );
+          }
+          mixer_sweep = MIXER_NO_SWEEP;
           break;
+
+          case BIAS_SCAN:
+            mixer_bias_scan();
+            break;
         
-        case RELAY_ENABLE: //0xF2
-          PORTD.OUTSET = 0x2;   //pin 1. OptoFet always ON
-          PORTD.OUTSET = 0x4;   //pin 2. Set Gain low 
-          PORTA.OUTSET = 0x10;  //pin 4. Enable relay (XOR gate)
-          PORTA.OUTCLR = 0x20;  //pin 5. Enable relay (XOR gate)
-          PORTD.OUTCLR = 0x4;   //Set gain High again.
-
-          sprintf( string, "Relay enabled");
-          RS232_SendString( string );
-          break;
-        
-        case RELAY_DISABLE: //0xF3
-          PORTA.OUTSET = 0x10;  //pin 4. Disable relay (XOR gate) 
-          PORTA.OUTSET = 0x20;  //pin 5. Disable relay (XOR gate)
-          
-          sprintf( string, "Relay disabled");
-          RS232_SendString( string );
-          break;
-        
-        case RESET: // Reset
-          watchdog_init( WDT_PER_8CLK_gc  ); // set watchdog timer to 8 msec
-          while ( true ); // infinite loop to wait for reset
-          break;
-        
-        case TEST:
-          //set channels voltages
-
-          DAC7615_SetOutput( 1, 1000); //B -0.512
-          DAC7615_SetOutput( 2, 2500); //C 0.552
-          DAC7615_SetOutput( 3, 3500); //D 1.772
-          
-          sprintf( string, "B:-0.512, C:0.552, D:1.772C");
-          RS232_SendString( string );
-          
-          //read channels before relay
-          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); 
-          RS232_SendString( string );
-
-          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); 
-          RS232_SendString( string );  
-
-          //enable relays
-          PORTA.OUT |= (1 << 4);   // This set 1 in pin4
-          PORTA.OUT &= ~(0 << 5);   // This set 0 in pin5
-          sprintf( string, "Relay enabled");
-          RS232_SendString( string );
-          delay_us(10000);
-
-          //read channels before relay
-          sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
-          RS232_SendString( string );
-
-          sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
-          RS232_SendString( string );          
-
-          DAC7615_SetOutput( 0, 500); //A 1.772
-          
-          sprintf( string, "A:-2.347");
-          RS232_SendString( string );
-
-          // //disable relays
-          // PORTA.OUT |= (1 << 4);  // This set 1 in pin4
-          // PORTA.OUT |= (1 << 5);  // This set 1 in pin5
-          // sprintf( string, "Relay disabled");
-          // RS232_SendString( string );
-          // delay_us(10000);
-
-          // //read channels before relay
-          // sprintf( string, "0 %d", LTC1859_ReadSingleChannel(0)); //*5/32768
-          // RS232_SendString( string );
-
-          // sprintf( string, "1 %d", LTC1859_ReadSingleChannel(1)); //*5/32768
-          // RS232_SendString( string );
-
-          break;
-
+          case MAGNET_SCAN:
+            mixer_magnet_scan();
+            break;
       }
       // display command number on LEDs
-      LED_PORT.OUTSET = i;
+      // LED_PORT.OUTSET = i;
     }
+ 
+  // sweep
+  if ( MIXER_BIAS_SWEEP == mixer_sweep )
+    mixer_bias_sweep_once();
+
+  if ( MIXER_MAGNET_SWEEP == mixer_sweep )
+    mixer_magnet_sweep_once();
+
   }
 }

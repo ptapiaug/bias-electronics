@@ -63,4 +63,8 @@
 #define TOGGLE_DEBUG       0xFD
 #define STATUS             0xFE
 #define RESET              0xFF
+#define SET_CHANNEL        0xF0
+#define GET_CHANNEL        0XF1
+#define RELAY_ENABLE       0XF2
+#define RELAY_DISABLE      0XF3
 
