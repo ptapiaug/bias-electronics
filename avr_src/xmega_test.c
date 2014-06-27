@@ -106,8 +106,7 @@ int main(void)
   char *cmd_p;
 //####//
 
-  uint8_t i, c;
-  int16_t v = 0;
+  uint8_t i;
   char string[ 80 ];
 
   uint16_t value;
@@ -284,10 +283,12 @@ int main(void)
 
           case BIAS_SCAN:
             mixer_bias_scan();
+            mixer_bias_restore();
             break;
         
           case MAGNET_SCAN:
             mixer_magnet_scan();
+            mixer_magnet_restore();
             break;
       }
       // display command number on LEDs

@@ -71,3 +71,6 @@ void mixer_bias_sweep_once( void );
 
 /*! bias Mixer Scan */
 void mixer_bias_scan(void);
+
+/*! bias Mixer Scan */
+void mixer_magnet_scan(void);

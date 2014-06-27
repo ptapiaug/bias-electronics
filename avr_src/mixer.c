@@ -169,19 +169,8 @@ void mixer_bias_scan(void){
   /////////////// FIRST ITERATION //////////////////////
   // Set the DAC in the minimum value
   DAC7615_SetOutput( DAC7615_BIAS_CHANNEL, MIXER_BIAS_MIN );
-  delay_us(100000);
+  delay_us(20);
 
-  ////##DEBUG##//
-  // char string[80];
-  // twoBytesValue = LTC1859_ReadSingleChannel(channel1);
-  // sprintf( string, "1: %d", twoBytesValue );
-  // RS232_SendString(string);
-
-  // twoBytesValue = LTC1859_ReadSingleChannel(channel1);
-  // sprintf( string, "1: %d", twoBytesValue );
-  // RS232_SendString(string);
-  ////##DEBUG##//
-  
   // Set up the config for reading of the channel1. Store the analog value of chn1.
   LTC1859_SetConfig(channel1);
 
@@ -191,19 +180,8 @@ void mixer_bias_scan(void){
     lessSignificantByte = (uint8_t) ( twoBytesValue );
   //Send the less significant byte first, for a correct interpretation.
 
-  //// ##DEBUG##//
-  // sprintf( string, "2: %d", twoBytesValue );
-  // RS232_SendString(string);  
-  ////##DEBUG##//
-
   RS232_SendChar(lessSignificantByte);
   RS232_SendChar(mostSignificantByte);
-
-  //##DEBUG##//
-  // twoBytesValue = LTC1859_ReadSingleChannel(channel1);
-  // sprintf( string, "3: %d", twoBytesValue );
-  // RS232_SendString(string);
-  //##DEBUG##//
 
   /////////////////////////////////////////////////////
   //////////////START SCAN LOOP////////////////////////
@@ -247,6 +225,13 @@ void mixer_bias_scan(void){
     RS232_SendChar(mostSignificantByte);
 
   }
+
+  //Read the last value from ch2. The argument of the function is not important.
+  twoBytesValue = LTC1859_ReadChannel_SetNextConfig(channel1);
+    mostSignificantByte = (uint8_t) ( twoBytesValue >> 8 );
+    lessSignificantByte = (uint8_t) ( twoBytesValue );
+    RS232_SendChar(lessSignificantByte);
+    RS232_SendChar(mostSignificantByte);  
 
   // Alive signal: blink onboard LED 3 times
   for ( i = 0; i < 8; i++ ){
