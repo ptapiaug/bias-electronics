@@ -290,6 +290,11 @@ int main(void)
             mixer_magnet_scan();
             mixer_magnet_restore();
             break;
+
+          case RESET: // Reset
+          watchdog_init( WDT_PER_8CLK_gc  ); // set watchdog timer to 8 msec
+          while ( true ); // infinite loop to wait for reset
+          break;
       }
       // display command number on LEDs
       // LED_PORT.OUTSET = i;

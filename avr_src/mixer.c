@@ -169,7 +169,8 @@ void mixer_bias_scan(void){
   /////////////// FIRST ITERATION //////////////////////
   // Set the DAC in the minimum value
   DAC7615_SetOutput( DAC7615_BIAS_CHANNEL, MIXER_BIAS_MIN );
-  delay_us(20);
+  
+  _delay_ms(20);
 
   // Set up the config for reading of the channel1. Store the analog value of chn1.
   LTC1859_SetConfig(channel1);
@@ -182,6 +183,8 @@ void mixer_bias_scan(void){
 
   RS232_SendChar(lessSignificantByte);
   RS232_SendChar(mostSignificantByte);
+
+
 
   /////////////////////////////////////////////////////
   //////////////START SCAN LOOP////////////////////////

@@ -80,13 +80,13 @@ void DAC7615_SetOutput( uint8_t channel, uint16_t value )
 {
   // set LOADREG high
   DAC7615_LOADREG_PORT.OUTSET = DAC7615_LOADREG_PIN_bm;
-
   // load register
   DAC7615_LoadRegister( channel, value );
 
   // set LOADREG low
   DAC7615_LOADREG_PORT.OUTCLR = DAC7615_LOADREG_PIN_bm;
 }
+
 
 
 
