@@ -1,0 +1,12 @@
+Bias Voltage 0:
+
+Mixer Voltage [-16384,16384] = -111. mixer.bias_value [0,4095] = 2047
+Mixer Current [-16384,16384] = -26
+
+Min:		
+x[0]: -13122.0
+x[4095]: -13011.0
+
+Max:
+12859
+

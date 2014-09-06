@@ -91,6 +91,7 @@ void init( void )
 
   PORTA.DIRSET = 0xff;  // all pins of PORTA are outputs
   PORTD.DIRSET = 0x6;
+  PORTB.DIRSET = 0x0f;
   LED_PORT.DIRSET = 0xFF; // all LED are output
 
 }
@@ -123,7 +124,10 @@ int main(void)
   // initialize Mixers
   init_mixers();
 
-
+  //NEW Relay. pin 1 ON.
+  _delay_ms(3000);
+  PORTB.OUTSET =0x02; 
+  
   // Alive signal: blink onboard LED 3 times
   for ( i = 0; i < 6; i++ )
   {
@@ -285,7 +289,21 @@ int main(void)
             mixer_bias_scan();
             mixer_bias_restore();
             break;
-        
+          
+          case BIAS_SCAN_TEST:
+            // Alive signal: blink onboard LED 3 times
+            for ( i = 0; i < 6; i++ )
+            {
+              ONBOARD_LED_PORT.OUTTGL = ONBOARD_LED;  // toggle LED on/off status
+              _delay_ms(1000);
+            }
+            ONBOARD_LED_PORT.OUTCLR = ONBOARD_LED;  // LED pin low (LED on)
+            for ( i = 0; i < 100; i++ )
+              {
+                mixer_bias_scan();
+              }
+            break;
+
           case MAGNET_SCAN:
             mixer_magnet_scan();
             mixer_magnet_restore();

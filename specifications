@@ -1,0 +1,26 @@
+./writebias "1 0x53"
+
+./streamrs232
+./dumprs232 > "TESTFILE.txt"
+od -An -v -w4 -td2 TESTFILE.txt > t
+
+
+
+Time of Scan: 1.4s. Meausured in the worst case. Set up the bias in the highest voltage and then start the scan from the lowest level.
+
+Scaling
+
+
+DAC Value	DAC Output[V]	MixerVoltage [mV]	ADC Input[V]	ADC Value 		MixerCurrent	ADC Input[V] 	ADC Value
+0			-2.503 			+8.9 				-2.011			-13203			-8.7			-2.492			-16366
+1000		-1.285			+4.6				-1.037 			-6824			-4.5 			-1.279			-8420
+2047		-0.009			+0.0 				-0.019			-134			-0.1 			-0.019 			-72
+2054		+0.0 			+0.0 				-0.012			-98				+0.0 			+0.0 			-14
+2500		+0.543			-1.9 				+0.422			+2750			+1.9 			+0.541			+3534	
+4095		+2.487			-8.9				+1.975			+12925			+8.6			+2.476 			+16223
+
+Factor: 0.29
+
+Average standard deviation of the ADC read out 2.21 
+
+
